@@ -147,6 +147,14 @@ header p{margin-top:4px;font-size:.85rem;color:var(--muted);letter-spacing:.3em;
     <button class="auto-btn off" id="autoBtn" style="display:none" onclick="toggleAutoRoll()">🤖 AUTO: OFF</button>
     <span class="save-indicator" id="saveIndicator">💾 Saved</span>
   </div>
+  <div style="width:100%;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px">
+    <div style="font-family:'Cinzel',serif;font-size:.78rem;letter-spacing:.3em;color:var(--muted);text-transform:uppercase">🔑 Redeem Code</div>
+    <div style="display:flex;gap:8px">
+      <input id="codeInput" type="text" placeholder="Enter code..." style="flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-family:'Rajdhani',sans-serif;font-size:.9rem;color:var(--text);outline:none;text-transform:uppercase" onkeydown="if(event.key==='Enter')redeemCode()">
+      <button onclick="redeemCode()" style="background:linear-gradient(135deg,#3d22aa,#6b30dd);border:none;border-radius:8px;padding:8px 20px;font-family:'Cinzel',serif;font-size:.8rem;font-weight:700;letter-spacing:.1em;color:#fff;cursor:pointer;text-transform:uppercase">Redeem</button>
+    </div>
+    <div id="codeMsg" style="font-size:.8rem;min-height:1em"></div>
+  </div>
   <div class="shop-section">
     <div class="shop-toggle" onclick="toggleShop()"><span>🛒 Shop</span><span class="shop-arrow" id="shopArrow">▼</span></div>
     <div class="shop-body" id="shopBody">
@@ -348,6 +356,7 @@ const RAW=[
   ["The Terminus","🔯","Omega","The absolute final point of all things","theTerminus"],
   // NULL
   ["NULL","🔳","Null","Before existence. After oblivion. This should not be.","nullAura"],
+  ["DEV","🔑","Null","You know the code.","devAura"],
 ];
 
 const ITEMS=RAW.map(([name,emoji,rarity,desc,effectId])=>({
@@ -650,6 +659,7 @@ dimensionZero:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);const cx=_W/2,cy=_
 theTerminus:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);const cx=_W/2,cy=_H/2;if(Math.random()<.08){const a=Math.random()*6.2832,d=70+Math.random()*15;addParticle(cx+Math.cos(a)*d,cy+Math.sin(a)*d*.5,0,0,1,2+Math.random()*5,Math.random()*360);}for(let i=pcount-1;i>=0;i--){const dx=cx-px[i],dy=cy-py[i];const d=Math.sqrt(dx*dx+dy*dy)||1;if(d<10){removeParticle(i);continue;}pvx[i]+=dx/d*.35;pvy[i]+=dy/d*.18;px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.01;if(plife[i]<=0){removeParticle(i);continue;}fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},90%,70%,${plife[i]*.8})`);}fillCircle(cx,cy,16,`rgba(0,0,0,1)`);strokeCircle(cx,cy,16,`rgba(${r},${g},${b},.8)`,3);for(let ring=1;ring<=4;ring++){strokeCircle(cx,cy,ring*18,`rgba(${r},${g},${b},${.15/ring})`,1);}}}),
 // ── NULL ──
 nullAura:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);const cx=_W/2,cy=_H/2;_ctx.fillStyle=`rgba(255,255,255,${.02+Math.sin(t*.01)*.01})`;_ctx.fillRect(0,0,_W,_H);for(let ring=1;ring<=12;ring++){const pulse=.5+.5*Math.sin(t*.02+ring*.3);strokeCircle(cx,cy,ring*9*pulse,`rgba(255,255,255,${.06/ring*pulse})`,1);}for(let i=0;i<20;i++){const a=i/20*6.2832+t*.003;const d=45+Math.sin(t*.03+i)*10;fillCircle(cx+Math.cos(a)*d,cy+Math.sin(a)*d*.5,2,`hsla(${i*18+t*.5},100%,80%,.6)`);}fillCircle(cx,cy,18,`rgba(255,255,255,.95)`);fillCircle(cx,cy,12,`rgba(0,0,0,.9)`);fillCircle(cx,cy,6,`rgba(255,255,255,.8)`);if(Math.random()<.15){const a=Math.random()*6.2832,d=10+Math.random()*50;addParticle(cx+Math.cos(a)*d,cy+Math.sin(a)*d*.5,(Math.random()-.5)*3,(Math.random()-.5)*2,1,2+Math.random()*5,Math.random()*360);}for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.015;if(plife[i]<=0){removeParticle(i);continue;}fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},100%,85%,${plife[i]})`);} }})
+,devAura:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);const cx=_W/2,cy=_H/2;_ctx.save();_ctx.font=`${18+Math.sin(t*.05)*4}px monospace`;_ctx.textAlign='center';_ctx.fillStyle=`rgba(255,215,0,${.3+Math.sin(t*.08)*.1})`;_ctx.fillText('DEV',cx,cy+6);_ctx.restore();for(let i=0;i<12;i++){const a=i/12*6.2832+t*.008;const d=45+Math.sin(t*.03+i)*8;fillCircle(cx+Math.cos(a)*d,cy+Math.sin(a)*d*.5,3,`hsla(${i*30+t*.5},100%,70%,.7)`);}strokeCircle(cx,cy,55,`rgba(255,215,0,${.15+Math.sin(t*.04)*.05})`,2);if(Math.random()<.1){const a=Math.random()*6.2832,d=10+Math.random()*45;addParticle(cx+Math.cos(a)*d,cy+Math.sin(a)*d*.5,(Math.random()-.5)*2,(Math.random()-.5)*1,1,2+Math.random()*4,Math.random()*360);}for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.018;if(plife[i]<=0){removeParticle(i);continue;}fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},100%,75%,${plife[i]})`);} }})
 };
 
 // ═══════════════════════════════════════════
@@ -916,6 +926,50 @@ function updateUI(){
 
 window.addEventListener('resize',()=>{if(st.equippedItem)startEffect(st.equippedItem);});
 
+// ═══════════════════════════════════════════
+//  CODES
+// ═══════════════════════════════════════════
+const CODES={
+  'AURA2025':    {type:'coins',  value:5000,       label:'+5,000 💰'},
+  'SPEEDRUN':    {type:'speed',  value:1,           label:'Free Speed Upgrade!'},
+  'LUCKYDAY':    {type:'luck',   bonus:5, rolls:30, label:'+5× Luck for 30 rolls!'},
+  'SECRETAURA':  {type:'aura',   name:'DEV',        label:'🔑 Secret Aura Unlocked!'},
+  'BIGBUCKS':    {type:'coins',  value:50000,       label:'+50,000 💰'},
+};
+let _redeemedCodes=JSON.parse(localStorage.getItem('auraRNG_codes')||'[]');
+
+function redeemCode(){
+  const input=document.getElementById('codeInput');
+  const msg=document.getElementById('codeMsg');
+  const code=input.value.trim().toUpperCase();
+  if(!code)return;
+  if(_redeemedCodes.includes(code)){
+    msg.textContent='❌ Already redeemed!';msg.style.color='#ef4444';return;
+  }
+  const reward=CODES[code];
+  if(!reward){
+    msg.textContent='❌ Invalid code!';msg.style.color='#ef4444';return;
+  }
+  _redeemedCodes.push(code);
+  localStorage.setItem('auraRNG_codes',JSON.stringify(_redeemedCodes));
+  if(reward.type==='coins'){st.coins+=reward.value;}
+  else if(reward.type==='speed'){if(st.speedLevel<SPEEDS.length)st.speedLevel++;}
+  else if(reward.type==='luck'){st.luck=1+reward.bonus;st.luckLeft=reward.rolls;}
+  else if(reward.type==='aura'){
+    const item=ITEMS.find(i=>i.name===reward.name);
+    if(item){
+      st.collection=st.collection||{};
+      st.collection[item.name]=(st.collection[item.name]||0)+1;
+      st.lastResult=item;
+      setCard(item,false);
+      showToast('🔑 Secret aura unlocked!');
+    }
+  }
+  msg.textContent='✅ '+reward.label;msg.style.color='#4ade80';
+  input.value='';
+  updateUI();saveGame();
+}
+  
 // ═══════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════
