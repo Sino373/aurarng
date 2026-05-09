@@ -107,6 +107,111 @@ header p{margin-top:4px;font-size:.85rem;color:var(--muted);letter-spacing:.3em;
 .save-indicator.show{opacity:1}
 </style>
 </head>
+<script>
+(function(){
+  // 1. Init collection + load from save
+  st.collection = st.collection || {};
+  try {
+    const saved = JSON.parse(localStorage.getItem('auraRNG_v1') || '{}');
+    if (saved.collection) {
+      st.collection = saved.collection;
+    } else if (st.history.length) {
+      // rebuild from history if no collection saved yet
+      st.history.forEach(function(item){
+        st.collection[item.name] = (st.collection[item.name] || 0) + 1;
+      });
+    }
+  } catch(e){}
+
+  // 2. Patch saveGame to persist collection
+  const _origSave = saveGame;
+  window.saveGame = function(){
+    try {
+      const data = {
+        coins: st.coins, rolls: st.rolls, luck: st.luck, luckLeft: st.luckLeft,
+        speedLevel: st.speedLevel, autoRollerOwned: st.autoRollerOwned,
+        history: st.history.map(i => i.name),
+        equippedItem: st.equippedItem ? st.equippedItem.name : null,
+        collection: st.collection
+      };
+      localStorage.setItem('auraRNG_v1', JSON.stringify(data));
+      const ind = document.getElementById('saveIndicator');
+      ind.classList.add('show');
+      clearTimeout(window._saveTimer);
+      window._saveTimer = setTimeout(() => ind.classList.remove('show'), 1500);
+    } catch(e){}
+  };
+
+  // 3. Patch addHistory to update collection + refresh modal if open
+  const _origAddHistory = addHistory;
+  window.addHistory = function(item){
+    _origAddHistory(item);
+    st.collection = st.collection || {};
+    st.collection[item.name] = (st.collection[item.name] || 0) + 1;
+    if (document.getElementById('collContent')) renderCollection();
+  };
+
+  // 4. Fix renderCollection sort: rarest first, then by weight within rarity
+  window.renderCollection = function(){
+    const content = document.getElementById('collContent');
+    if (!content) return;
+    const stats = document.getElementById('collStats');
+    const coll = st.collection || {};
+    const totalUnique = Object.keys(coll).filter(k => coll[k] > 0).length;
+    if (stats) stats.textContent = totalUnique + ' / ' + ITEMS.length + ' auras discovered';
+
+    if (totalUnique === 0) {
+      content.innerHTML = '<div class="coll-empty">Roll some auras to start your collection!</div>';
+      return;
+    }
+    content.innerHTML = '';
+
+    // rarest → most common
+    const rarityOrder = [...RARITY_RANK].reverse();
+
+    rarityOrder.forEach(function(rarity){
+      const inRarity = ITEMS.filter(i => i.rarity === rarity);
+      const owned = inRarity.filter(i => coll[i.name] > 0)
+        .sort((a, b) => a.weight - b.weight); // rarest weight first within group
+      if (!owned.length) return;
+
+      const group = document.createElement('div');
+      group.className = 'coll-rarity-group';
+
+      const hdr = document.createElement('div');
+      hdr.className = 'coll-rarity-hdr';
+      hdr.innerHTML = `<span style="color:${RARITIES[rarity].color};text-shadow:0 0 12px ${RARITIES[rarity].glow}">${rarity}</span><span class="coll-rarity-pct" style="color:${RARITIES[rarity].color}">${owned.length} / ${inRarity.length}</span>`;
+      group.appendChild(hdr);
+
+      const grid = document.createElement('div');
+      grid.className = 'coll-grid';
+
+      owned.forEach(function(item){
+        const count = coll[item.name] || 0;
+        const card = document.createElement('div');
+        card.className = 'coll-card';
+        card.style.borderColor = item.color + '33';
+        card.style.boxShadow = count > 1 ? `0 0 8px ${item.glow}22` : 'none';
+        card.innerHTML = `
+          <div class="coll-emoji">${item.emoji}</div>
+          <div class="coll-name" style="color:${item.color}">${item.name}</div>
+          <div class="coll-count">×${count.toLocaleString()} obtained</div>
+          <button class="coll-equip">⚡ Equip</button>`;
+        card.querySelector('.coll-equip').onclick = function(){
+          equip(item);
+          closeCollection();
+          showToast('Equipped: ' + item.name);
+        };
+        grid.appendChild(card);
+      });
+
+      group.appendChild(grid);
+      content.appendChild(group);
+    });
+  };
+
+})();
+</script>
 <body>
 <div class="bg-stars"></div>
 <div class="bg-stars"></div>
