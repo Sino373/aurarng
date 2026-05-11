@@ -301,7 +301,7 @@ const RARITIES={
   "Secret":        {color:"#ef4444",weight:.025,  glow:"rgba(239,68,68,.7)"},
   "Ultra Secret":  {color:"#ff00ff",weight:.0001,  glow:"rgba(255,0,255,.9)"},
   "Null":          {color:"#ffffff",weight:.00001, glow:"rgba(255,255,255,1)"},
-  "Impossible":          {color:"#ffffff",weight:.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001, glow:"rgba(255,255,255,1)"},
+  "Impossible":          {color:"#fd700",weight:.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001, glow:"rgba(255,255,255,1)"},
 };
 const RARITY_RANK=Object.keys(RARITIES);
 const COIN_VAL={"Common":5,"Uncommon":15,"Rare":45,"Epic":120,"Legendary":350,"Mythic":900,"Divine":2500,"Cosmic":8000,"Celestial":30000,"Transcendent":100000,"Primordial":500000,"Abyssal":2000000,"Eternal":10000000,"Omega":50000000,"Secret":400000,"Ultra Secret":2000000,"Null":999999999};
@@ -462,7 +462,7 @@ const RAW=[
   ["The Terminus","🔯","Omega","The absolute final point of all things","theTerminus"],
   // NULL
   ["NULL","🔳","Null","Before existence. After oblivion. This should not be.","nullAura"],
-  ["DEV","🔑","Impossible","You know the code.","devAura"],
+  ["DEV","🔑","Impossible","How the hell do you have this?.","devAura"],
 ];
 
 const ITEMS=RAW.map(([name,emoji,rarity,desc,effectId])=>({
