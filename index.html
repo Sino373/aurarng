@@ -1673,5 +1673,1066 @@ window.redeemCode = function(){
 
 })();
 </script>
+<!--
+═══════════════════════════════════════════════════════════════
+  AURA RNG — EXPANSION PATCH
+  Paste this ENTIRE block right before </body> in your file.
+  Adds:
+    • 20 new auras with custom canvas effects
+    • Crafting system (Sols-RNG style sacrifice -> recipe)
+    • Reworked auto-roll with stop conditions (low credit cost)
+═══════════════════════════════════════════════════════════════
+-->
+<style>
+/* ─── Crafting + AutoRoll Config UI ─── */
+.craft-btn, .auto-cfg-btn{
+  background:linear-gradient(135deg,rgba(192,132,252,.15),rgba(192,132,252,.05));
+  border:1px solid rgba(192,132,252,.35);border-radius:8px;
+  padding:5px 14px;font-family:'Cinzel',serif;font-size:.7rem;
+  font-weight:700;letter-spacing:.2em;color:rgba(192,132,252,.9);
+  cursor:pointer;text-transform:uppercase;transition:all .2s;
+}
+.craft-btn:hover, .auto-cfg-btn:hover{background:rgba(192,132,252,.22);border-color:rgba(192,132,252,.6);}
+.auto-cfg-btn{
+  background:linear-gradient(135deg,rgba(74,222,128,.12),rgba(74,222,128,.04));
+  border-color:rgba(74,222,128,.35);color:rgba(74,222,128,.9);
+}
+.auto-cfg-btn:hover{background:rgba(74,222,128,.22);border-color:rgba(74,222,128,.6);}
+
+.craft-overlay, .autocfg-overlay{
+  position:fixed;inset:0;z-index:600;
+  background:rgba(4,5,15,.94);backdrop-filter:blur(10px);
+  display:flex;flex-direction:column;align-items:center;
+  overflow-y:auto;padding:20px 14px 60px;
+  animation:collIn .25s ease;
+}
+.craft-inner, .autocfg-inner{width:100%;max-width:880px;}
+.craft-topbar, .autocfg-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;padding-bottom:12px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.craft-title{
+  font-family:'Cinzel',serif;font-size:1.4rem;font-weight:900;letter-spacing:.15em;
+  background:linear-gradient(135deg,#c084fc,#f472b6,#fbbf24);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.autocfg-title{
+  font-family:'Cinzel',serif;font-size:1.4rem;font-weight:900;letter-spacing:.15em;
+  background:linear-gradient(135deg,#4ade80,#22d3ee,#7eb8ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.craft-stats, .autocfg-sub{font-size:.78rem;color:rgba(180,195,255,.4);letter-spacing:.08em;}
+.craft-close, .autocfg-close{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;padding:8px 16px;font-family:'Rajdhani',sans-serif;
+  font-size:.85rem;font-weight:700;color:rgba(180,195,255,.6);cursor:pointer;
+}
+.craft-close:hover, .autocfg-close:hover{background:rgba(255,255,255,.12);color:#dde4f8;}
+
+.recipe-card{
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;padding:16px;margin-bottom:14px;
+}
+.recipe-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.06);
+}
+.recipe-name{font-family:'Cinzel',serif;font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:8px;}
+.recipe-rarity{font-size:.7rem;letter-spacing:.25em;text-transform:uppercase;}
+.recipe-desc{font-size:.82rem;color:rgba(180,195,255,.55);margin-bottom:10px;line-height:1.4;}
+.recipe-ingredients{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+.ingr-chip{
+  background:rgba(255,255,255,.04);border:1px solid var(--ic,rgba(255,255,255,.12));
+  border-radius:8px;padding:5px 10px;font-size:.78rem;display:flex;align-items:center;gap:6px;
+  color:var(--ic,#dde4f8);
+}
+.ingr-chip .got{color:#4ade80;font-weight:700;}
+.ingr-chip .need{color:#ef4444;font-weight:700;}
+.craft-do-btn{
+  width:100%;background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(244,114,182,.12));
+  border:1px solid rgba(192,132,252,.4);border-radius:10px;padding:9px 0;
+  font-family:'Cinzel',serif;font-size:.85rem;font-weight:700;letter-spacing:.18em;
+  color:#fff;cursor:pointer;transition:all .2s;text-transform:uppercase;
+}
+.craft-do-btn:hover:not(:disabled){background:rgba(192,132,252,.3);transform:translateY(-1px);}
+.craft-do-btn:disabled{opacity:.35;cursor:not-allowed;}
+.craft-do-btn.owned{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.4);color:#4ade80;cursor:default;}
+
+/* AutoRoll config */
+.autocfg-section{
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
+  border-radius:14px;padding:16px;margin-bottom:14px;
+}
+.autocfg-section h3{
+  font-family:'Cinzel',serif;font-size:.78rem;letter-spacing:.25em;
+  color:rgba(180,195,255,.5);text-transform:uppercase;margin-bottom:10px;
+}
+.rarity-toggle-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.rarity-toggle{
+  background:rgba(255,255,255,.04);border:1px solid var(--rc,rgba(255,255,255,.12));
+  border-radius:8px;padding:5px 11px;font-size:.78rem;font-weight:600;
+  color:var(--rc,#9ca3af);cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;gap:5px;user-select:none;
+}
+.rarity-toggle.active{background:var(--rc,#9ca3af)33;box-shadow:0 0 10px var(--rg,rgba(255,255,255,.3));}
+.rarity-toggle .check{opacity:0;font-weight:900;}
+.rarity-toggle.active .check{opacity:1;}
+.autocfg-row{display:flex;align-items:center;gap:10px;margin-top:8px;}
+.autocfg-row label{font-size:.82rem;color:rgba(180,195,255,.7);min-width:130px;}
+.autocfg-row input[type=number]{
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:6px;padding:5px 10px;font-family:'Rajdhani',sans-serif;
+  font-size:.85rem;color:#dde4f8;outline:none;width:80px;
+}
+.autocfg-hint{font-size:.72rem;color:rgba(180,195,255,.35);margin-top:6px;line-height:1.4;}
+</style>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   1) ADD 20 NEW AURAS + EFFECTS
+   ═══════════════════════════════════════════════════════════════ */
+(function(){
+  // 20 new auras spread across rarities for variety
+  const NEW_AURAS = [
+    // 2x Rare
+    ["Moonpetal","🌸","Rare","Petals that bloom only under moonlight","moonpetal"],
+    ["Tidewhisper","🐚","Rare","The sea hums in this shell forever","tidewhisper"],
+    // 2x Epic
+    ["Stormcaller","🌩️","Epic","Lightning answers when this is named","stormcaller"],
+    ["Mirrorshard","🪞","Epic","Reflects what could have been","mirrorshard"],
+    // 2x Legendary
+    ["Sunforged","☄️","Legendary","Hammered in a star's heart","sunforged"],
+    ["Frostbloom","🌷","Legendary","A flower that grows in killing cold","frostbloom"],
+    // 2x Mythic
+    ["Hollow Crown","👑","Mythic","Worn by kings who were never seen","hollowCrown"],
+    ["Voidsong","🎶","Mythic","A melody that erases what hears it","voidsong"],
+    // 2x Divine
+    ["Astral Loom","🕸️","Divine","Where fates are woven from starlight","astralLoom"],
+    ["Lifebinder","🌳","Divine","Roots reaching through every realm","lifebinder"],
+    // 1x Cosmic
+    ["Cosmic Bloom","🌺","Cosmic","A flower the size of a galaxy","cosmicBloom"],
+    ["Stardust Veil","✨","Cosmic","All stars woven into a single cloth","stardustVeil"],
+    // 1x Celestial
+    ["Heavens Gate","🚪","Celestial","The door between worlds, ajar","heavensGate"],
+    // 1x Transcendent
+    ["Aether Bloom","💮","Transcendent","Pure essence given form","aetherBloom"],
+    // 1x Primordial
+    ["Worldforge","⚒️","Primordial","The anvil where realities are hammered","worldforge"],
+    // 1x Abyssal
+    ["Hungering Dark","🦷","Abyssal","It is always feeding. It is never full.","hungeringDark"],
+    // 1x Eternal
+    ["Last Star","⭐","Eternal","Burns long after the others die","lastStar"],
+    // 1x Omega
+    ["Null Hymn","🎼","Omega","The song sung at the end of songs","nullHymn"],
+    // 2x CRAFTED-ONLY (special rarity tag — only obtainable via crafting)
+    ["Prismatic Heart","💗","Mythic","Crafted from balanced auras. It pulses with all colors at once.","prismaticHeart"],
+    ["Eclipse Sovereign","🌗","Divine","Crafted from light and dark in harmony","eclipseSovereign"],
+  ];
+
+  // Mark crafted-only auras (weight = 0, won't roll)
+  const CRAFTED_ONLY = new Set(["Prismatic Heart","Eclipse Sovereign"]);
+
+  // Push new auras into ITEMS
+  NEW_AURAS.forEach(([name,emoji,rarity,desc,effectId])=>{
+    const isCrafted = CRAFTED_ONLY.has(name);
+    const weight = isCrafted ? 0 : RARITIES[rarity].weight;
+    ITEMS.push({
+      name,emoji,rarity,desc,effectId,
+      color:RARITIES[rarity].color,
+      glow:RARITIES[rarity].glow,
+      weight,
+      craftedOnly: isCrafted
+    });
+  });
+
+  // Rebuild CUM_W / TOTAL_W (only include rollable items, but keep ITEMS index intact)
+  // Easier: recompute the cumulative weight with crafted items weight=0
+  const newTotal = ITEMS.reduce((s,i)=>s+i.weight,0);
+  // Replace exported references
+  window.TOTAL_W = newTotal;
+  // Build a new typed array
+  const newCum = new Float64Array(ITEMS.length);
+  let acc = 0;
+  ITEMS.forEach((it,i)=>{ acc+=it.weight; newCum[i]=acc; });
+  // Overwrite the original CUM_W contents (it was const but Float64Array contents are writable)
+  // If size mismatched, replace globally:
+  if(CUM_W.length !== ITEMS.length){
+    window.CUM_W = newCum;
+  } else {
+    for(let i=0;i<newCum.length;i++) CUM_W[i] = newCum[i];
+  }
+
+  // ── Custom effects for new auras ──
+  Object.assign(EFFECTS, {
+    moonpetal:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      // soft moon
+      fillCircle(_W*0.75,_H*0.3,16,'rgba(230,230,255,.45)');
+      strokeCircle(_W*0.75,_H*0.3,18,'rgba(230,230,255,.15)',2);
+      if(Math.random()<.12)addParticle(Math.random()*_W,-5,(Math.random()-.5)*.4,.6+Math.random()*.6,1,6+Math.random()*5,300+Math.random()*30);
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i]+Math.sin(t*.03+py[i]*.02)*.5;py[i]+=pvy[i];plife[i]-=.006;
+        if(plife[i]<=0||py[i]>_H){removeParticle(i);continue;}
+        _ctx.save();_ctx.translate(px[i],py[i]);_ctx.rotate(t*.02+px[i]*.01);
+        _ctx.beginPath();_ctx.ellipse(0,0,psz[i]*.5,psz[i],0,0,6.2832);
+        _ctx.fillStyle=`hsla(${phue[i]},70%,80%,${plife[i]*.75})`;_ctx.fill();_ctx.restore();
+      }}}),
+    tidewhisper:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      for(let layer=0;layer<3;layer++){const speed=(layer+1)*.018;const yBase=_H*.55+layer*16;
+        _ctx.beginPath();for(let x=0;x<=_W;x+=4){const y=yBase+Math.sin(x/_W*6.2832*1.8+t*speed)*9;
+          x===0?_ctx.moveTo(x,y):_ctx.lineTo(x,y);}
+        _ctx.strokeStyle=`rgba(${r},${g},${b},${.15+layer*.05})`;_ctx.lineWidth=1.5;_ctx.stroke();}
+      // Shell silhouette
+      _ctx.save();_ctx.translate(_W/2,_H*.4);
+      for(let i=0;i<5;i++){const a=(i/5)*Math.PI;
+        line(0,0,Math.cos(a-Math.PI/2)*22,Math.sin(a-Math.PI/2)*22,`rgba(${r},${g},${b},.35)`,1.5);}
+      strokeCircle(0,0,22,`rgba(${r},${g},${b},.4)`,2);_ctx.restore();
+      if(Math.random()<.08)addParticle(_W/2+(Math.random()-.5)*60,_H*.4,0,0,1,3+Math.random()*6,200);
+      for(let i=pcount-1;i>=0;i--){psz[i]+=.6;plife[i]-=.02;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        strokeCircle(px[i],py[i],psz[i],`rgba(${r},${g},${b},${plife[i]*.4})`,1);}}}),
+    stormcaller:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      if(t%14===0){for(let bolt=0;bolt<2;bolt++){let x=_W/2+(Math.random()-.5)*_W*.6,y=0;
+        _ctx.beginPath();_ctx.moveTo(x,y);
+        for(let s=0;s<10;s++){x+=(Math.random()-.5)*60;y+=_H/10;_ctx.lineTo(x,y);}
+        _ctx.strokeStyle=`rgba(${r},${g},${b},.85)`;_ctx.lineWidth=2.5;_ctx.stroke();
+        _ctx.strokeStyle='rgba(255,255,255,.7)';_ctx.lineWidth=1;_ctx.stroke();}
+        _ctx.fillStyle=`rgba(${r},${g},${b},.05)`;_ctx.fillRect(0,0,_W,_H);}
+      // Swirling clouds
+      for(let i=0;i<3;i++){const a=t*.005+i*2.09;
+        strokeCircle(_W/2+Math.cos(a)*30,_H/3+Math.sin(a)*10,18+i*4,`rgba(${r},${g},${b},.12)`,2);}
+      if(Math.random()<.12)addParticle(Math.random()*_W,Math.random()*_H*.5,(Math.random()-.5)*3,1+Math.random()*2,1,2+Math.random()*3,phue[0]||270);
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.03;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`rgba(${r},${g},${b},${plife[i]})`);}}}),
+    mirrorshard:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      for(let i=0;i<6;i++){const a=i/6*6.2832+t*.005;const d=35+Math.sin(t*.03+i)*8;
+        const x=cx+Math.cos(a)*d,y=cy+Math.sin(a)*d*.5;
+        _ctx.save();_ctx.translate(x,y);_ctx.rotate(a+t*.02);
+        _ctx.beginPath();_ctx.moveTo(0,-8);_ctx.lineTo(6,0);_ctx.lineTo(0,8);_ctx.lineTo(-6,0);_ctx.closePath();
+        _ctx.fillStyle=`rgba(${r},${g},${b},.5)`;_ctx.fill();
+        _ctx.strokeStyle='rgba(255,255,255,.6)';_ctx.lineWidth=.8;_ctx.stroke();_ctx.restore();}
+      // Reflections
+      if(Math.random()<.1){const a=Math.random()*6.2832,d=20+Math.random()*40;
+        addParticle(cx+Math.cos(a)*d,cy+Math.sin(a)*d*.5,(Math.random()-.5)*1,(Math.random()-.5)*1,1,2+Math.random()*3,Math.random()*360);}
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.02;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},90%,80%,${plife[i]})`);}}}),
+    sunforged:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // Hammered radial blasts
+      for(let i=0;i<10;i++){const a=i/10*6.2832+t*.004;
+        const beat=Math.abs(Math.sin(t*.05+i));
+        const len=30+beat*25;
+        line(cx+Math.cos(a)*18,cy+Math.sin(a)*9,cx+Math.cos(a)*(18+len),cy+Math.sin(a)*(18+len)*.5,
+          `hsla(${30+beat*30},100%,${55+beat*20}%,${.3+beat*.3})`,2+beat*2);}
+      fillCircle(cx,cy,18,`rgba(255,200,80,.7)`);
+      fillCircle(cx,cy,11,`rgba(255,255,200,.95)`);
+      if(Math.random()<.2){const a=Math.random()*6.2832;
+        addParticle(cx+Math.cos(a)*18,cy+Math.sin(a)*9,Math.cos(a)*(2+Math.random()*3),Math.sin(a)*(2+Math.random()*3)*.5,1,3+Math.random()*5,20+Math.random()*40);}
+      for(let i=pcount-1;i>=0;i--){pvx[i]*=.98;pvy[i]*=.98;px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.018;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},100%,70%,${plife[i]})`);}}}),
+    frostbloom:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // Petals
+      for(let i=0;i<6;i++){const a=i/6*6.2832+t*.006;
+        _ctx.save();_ctx.translate(cx,cy);_ctx.rotate(a);
+        _ctx.beginPath();_ctx.ellipse(20,0,18,9,0,0,6.2832);
+        _ctx.fillStyle=`rgba(${r},${g},${b},.35)`;_ctx.fill();
+        _ctx.strokeStyle=`rgba(255,255,255,.4)`;_ctx.lineWidth=1;_ctx.stroke();
+        _ctx.restore();}
+      fillCircle(cx,cy,10,`rgba(255,255,255,.6)`);
+      // Frost flakes
+      if(Math.random()<.1)addParticle(Math.random()*_W,-5,(Math.random()-.5)*.3,.6+Math.random()*.8,1,3+Math.random()*4,200);
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.008;
+        if(plife[i]<=0||py[i]>_H){removeParticle(i);continue;}
+        _ctx.save();_ctx.translate(px[i],py[i]);_ctx.rotate(t*.03);
+        for(let b=0;b<6;b++){const ba=b*1.047;
+          line(0,0,Math.cos(ba)*psz[i],Math.sin(ba)*psz[i],`rgba(${r},${g},${b},${plife[i]*.6})`,1);}
+        _ctx.restore();}}}),
+    hollowCrown:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // crown silhouette
+      _ctx.save();_ctx.translate(cx,cy);
+      _ctx.beginPath();_ctx.moveTo(-30,10);
+      const spikes=5;for(let i=0;i<=spikes;i++){const sx=-30+i*(60/spikes);
+        _ctx.lineTo(sx,-15);_ctx.lineTo(sx+30/spikes,10);}
+      _ctx.closePath();_ctx.strokeStyle=`rgba(${r},${g},${b},.6)`;_ctx.lineWidth=2;_ctx.stroke();
+      // gems
+      for(let i=0;i<spikes;i++){const sx=-30+i*(60/spikes)+30/spikes;
+        const pulse=Math.sin(t*.04+i)*.5+.5;
+        fillCircle(sx,-12,3+pulse,`rgba(${r},${g},${b},${.5+pulse*.3})`);}
+      _ctx.restore();
+      // Ghostly aura
+      if(Math.random()<.08)addParticle(cx+(Math.random()-.5)*70,cy-5,(Math.random()-.5)*.3,-(0.3+Math.random()*.5),1,5+Math.random()*8,30+Math.random()*30);
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];psz[i]+=.05;plife[i]-=.012;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i],`hsla(${phue[i]},60%,55%,${plife[i]*.25})`);}}}),
+    voidsong:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      // Audio-wave style with void warping
+      for(let harmonic=1;harmonic<=4;harmonic++){_ctx.beginPath();
+        for(let x=0;x<=_W;x+=3){const amp=18/harmonic;
+          const y=_H/2+Math.sin(x/_W*6.2832*harmonic*1.5+t*.025)*amp*Math.sin(t*.01+harmonic);
+          x===0?_ctx.moveTo(x,y):_ctx.lineTo(x,y);}
+        _ctx.strokeStyle=`rgba(${r},${g},${b},${.3/harmonic})`;_ctx.lineWidth=2.5/harmonic;_ctx.stroke();}
+      // Dark notes
+      if(Math.random()<.06){const x=Math.random()*_W;
+        addParticle(x,_H/2,0,(Math.random()<.5?-1:1)*(0.5+Math.random()),1,4+Math.random()*5,Math.random()*360);}
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.012;psz[i]+=.04;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},70%,40%,${plife[i]*.35})`);}}}),
+    astralLoom:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      // Threads weaving
+      const cx=_W/2,cy=_H/2;
+      for(let i=0;i<12;i++){const a1=i/12*6.2832+t*.003;
+        const a2=((i+5)%12)/12*6.2832+t*.003;
+        const x1=cx+Math.cos(a1)*55,y1=cy+Math.sin(a1)*30;
+        const x2=cx+Math.cos(a2)*55,y2=cy+Math.sin(a2)*30;
+        line(x1,y1,x2,y2,`rgba(${r},${g},${b},${.08+Math.sin(t*.02+i)*.04})`,1);}
+      // Nodes on outer ring
+      for(let i=0;i<12;i++){const a=i/12*6.2832+t*.003;
+        fillCircle(cx+Math.cos(a)*55,cy+Math.sin(a)*30,2.5,`rgba(${r},${g},${b},.7)`);}
+      // Star sparks
+      if(Math.random()<.15)addParticle(cx+(Math.random()-.5)*110,cy+(Math.random()-.5)*60,0,0,1,1.5+Math.random()*2,300+Math.random()*40);
+      for(let i=pcount-1;i>=0;i--){plife[i]-=.04;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`rgba(255,255,255,${plife[i]})`);}}}),
+    lifebinder:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      // Roots growing outward
+      const cx=_W/2,cy=_H*.55;
+      for(let root=0;root<5;root++){const baseA=root/5*Math.PI*2;
+        _ctx.beginPath();_ctx.moveTo(cx,cy);
+        let x=cx,y=cy;
+        for(let s=0;s<10;s++){const a=baseA+Math.sin(t*.01+s*.4+root)*.6;
+          x+=Math.cos(a)*8;y+=Math.sin(a)*5;_ctx.lineTo(x,y);}
+        _ctx.strokeStyle=`rgba(${r},${g},${b},.45)`;_ctx.lineWidth=2;_ctx.stroke();}
+      // Leaves
+      if(Math.random()<.1)addParticle(_W*.2+Math.random()*_W*.6,cy-Math.random()*40,(Math.random()-.5)*.4,-(0.3+Math.random()*.5),1,5+Math.random()*6,100+Math.random()*40);
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i]+Math.sin(t*.03+px[i]*.02)*.4;py[i]+=pvy[i];plife[i]-=.008;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        _ctx.save();_ctx.translate(px[i],py[i]);_ctx.rotate(t*.02);
+        _ctx.beginPath();_ctx.ellipse(0,0,psz[i]*.4,psz[i],0,0,6.2832);
+        _ctx.fillStyle=`hsla(${phue[i]},70%,55%,${plife[i]*.8})`;_ctx.fill();_ctx.restore();}}}),
+    cosmicBloom:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // Galactic petals
+      for(let layer=0;layer<3;layer++){for(let i=0;i<8;i++){const a=i/8*6.2832+t*.004+layer*.3;
+        const dist=15+layer*18;const sz=8+layer*4;
+        _ctx.save();_ctx.translate(cx+Math.cos(a)*dist,cy+Math.sin(a)*dist*.55);_ctx.rotate(a);
+        _ctx.beginPath();_ctx.ellipse(0,0,sz,sz*.4,0,0,6.2832);
+        _ctx.fillStyle=`hsla(${(t*.5+layer*60+i*15)%360},80%,65%,${.2-layer*.04})`;_ctx.fill();
+        _ctx.restore();}}
+      fillCircle(cx,cy,9,`rgba(255,255,255,.85)`);
+      if(Math.random()<.1){const a=Math.random()*6.2832,d=10+Math.random()*40;
+        addParticle(cx+Math.cos(a)*d,cy+Math.sin(a)*d*.55,(Math.random()-.5)*1,(Math.random()-.5)*.5,1,1.5+Math.random()*2,Math.random()*360);}
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.015;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},100%,80%,${plife[i]})`);}}}),
+    stardustVeil:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      // Drifting stardust grid
+      for(let i=0;i<60;i++){const baseX=(i%10)*(_W/10);
+        const baseY=Math.floor(i/10)*(_H/6);
+        const wobX=Math.sin(t*.015+i*.3)*8;const wobY=Math.cos(t*.012+i*.5)*5;
+        const a=.15+Math.sin(t*.04+i)*.1;
+        fillCircle(baseX+wobX,baseY+wobY,1+Math.sin(t*.05+i)*.5,`hsla(${(i*6+t*.5)%360},80%,80%,${a})`);}
+      // central shimmer
+      if(Math.random()<.2){const x=Math.random()*_W,y=Math.random()*_H;
+        addParticle(x,y,0,0,1,1.5,Math.random()*360);}
+      for(let i=pcount-1;i>=0;i--){plife[i]-=.04;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i]*2,`hsla(${phue[i]},90%,85%,${plife[i]})`);}}}),
+    heavensGate:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // Gate arch
+      _ctx.beginPath();_ctx.arc(cx,cy+25,40,Math.PI,0);
+      _ctx.strokeStyle=`rgba(${r},${g},${b},.5)`;_ctx.lineWidth=3;_ctx.stroke();
+      // Inner glow
+      const glowPulse=.4+.2*Math.sin(t*.04);
+      _ctx.beginPath();_ctx.arc(cx,cy+25,38,Math.PI,0);
+      _ctx.fillStyle=`rgba(255,255,220,${glowPulse*.3})`;_ctx.fill();
+      // Pillars
+      _ctx.fillStyle=`rgba(${r},${g},${b},.4)`;
+      _ctx.fillRect(cx-42,cy-15,4,40);_ctx.fillRect(cx+38,cy-15,4,40);
+      // Light beam particles
+      if(Math.random()<.2)addParticle(cx+(Math.random()-.5)*70,cy+25,(Math.random()-.5)*.5,-(1+Math.random()*1.5),1,2+Math.random()*3,50+Math.random()*20);
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.015;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},90%,85%,${plife[i]})`);}
+      fillCircle(cx,cy+25,6,`rgba(255,255,255,${glowPulse})`);}}),
+    aetherBloom:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // Crystalline bloom
+      for(let layer=0;layer<3;layer++){const petals=6+layer*2;
+        for(let i=0;i<petals;i++){const a=i/petals*6.2832+t*.005*(layer%2?1:-1);
+          const inner=10+layer*10,outer=25+layer*12;
+          _ctx.save();_ctx.translate(cx,cy);_ctx.rotate(a);
+          _ctx.beginPath();_ctx.moveTo(inner,0);_ctx.lineTo(outer,-4);_ctx.lineTo(outer+6,0);_ctx.lineTo(outer,4);_ctx.closePath();
+          _ctx.fillStyle=`hsla(${(t*.3+layer*60+i*20)%360},85%,75%,${.3-layer*.06})`;_ctx.fill();
+          _ctx.strokeStyle='rgba(255,255,255,.4)';_ctx.lineWidth=.5;_ctx.stroke();
+          _ctx.restore();}}
+      fillCircle(cx,cy,8,`rgba(255,255,255,.95)`);
+      if(Math.random()<.2){const a=Math.random()*6.2832;
+        addParticle(cx,cy,Math.cos(a)*(.5+Math.random()*1),Math.sin(a)*(.5+Math.random()*1)*.5,1,1.5+Math.random()*2,Math.random()*360);}
+      for(let i=pcount-1;i>=0;i--){pvx[i]*=.98;pvy[i]*=.98;px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.018;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},100%,85%,${plife[i]})`);}}}),
+    worldforge:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H*.6;
+      // Anvil shape
+      _ctx.fillStyle=`rgba(${r},${g},${b},.4)`;
+      _ctx.fillRect(cx-30,cy,60,8);
+      _ctx.fillRect(cx-20,cy+8,40,12);
+      // Hammer strikes
+      const strike=Math.sin(t*.08);if(strike>.85){
+        // big spark burst
+        for(let i=0;i<6;i++){const a=Math.random()*Math.PI-Math.PI;
+          addParticle(cx,cy,Math.cos(a)*(2+Math.random()*4),Math.sin(a)*(1+Math.random()*2),1,3+Math.random()*5,15+Math.random()*30);}
+        _ctx.fillStyle=`rgba(255,200,80,.15)`;_ctx.fillRect(0,0,_W,_H);
+      }
+      // Continuous embers
+      if(Math.random()<.2)addParticle(cx+(Math.random()-.5)*30,cy,(Math.random()-.5)*2,-(1+Math.random()*2),1,2+Math.random()*4,5+Math.random()*50);
+      for(let i=pcount-1;i>=0;i--){pvy[i]+=.1;px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.022;
+        if(plife[i]<=0||py[i]>_H){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},100%,65%,${plife[i]})`);}
+      // Glow on anvil
+      fillCircle(cx,cy+2,10+Math.sin(t*.08)*3,`rgba(255,150,50,${.3+Math.sin(t*.08)*.15})`);}}),
+    hungeringDark:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // Teeth ring
+      const teeth=12;
+      for(let i=0;i<teeth;i++){const a=i/teeth*6.2832+t*.01;
+        const d=22+Math.abs(Math.sin(t*.05+i))*4;
+        const x=cx+Math.cos(a)*d,y=cy+Math.sin(a)*d*.5;
+        _ctx.save();_ctx.translate(x,y);_ctx.rotate(a+Math.PI/2);
+        _ctx.beginPath();_ctx.moveTo(0,-5);_ctx.lineTo(3,3);_ctx.lineTo(-3,3);_ctx.closePath();
+        _ctx.fillStyle=`rgba(240,240,240,.7)`;_ctx.fill();_ctx.restore();}
+      // Dark center
+      fillCircle(cx,cy,16,`rgba(0,0,0,.95)`);
+      strokeCircle(cx,cy,16,`rgba(${r},${g},${b},.5)`,2);
+      // Consuming
+      if(Math.random()<.2){const a=Math.random()*6.2832,d=70+Math.random()*20;
+        addParticle(cx+Math.cos(a)*d,cy+Math.sin(a)*d*.5,0,0,1,3+Math.random()*5,Math.random()*360);}
+      for(let i=pcount-1;i>=0;i--){const dx=cx-px[i],dy=cy-py[i];
+        const d=Math.sqrt(dx*dx+dy*dy)||1;if(d<18){removeParticle(i);continue;}
+        pvx[i]+=dx/d*.35;pvy[i]+=dy/d*.18;
+        px[i]+=pvx[i];py[i]+=pvy[i];psz[i]*=.98;plife[i]-=.01;
+        if(plife[i]<=0||psz[i]<.3){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},60%,40%,${plife[i]*.7})`);}}}),
+    lastStar:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      // Dim sparse stars (others "dying")
+      for(let i=0;i<6;i++){const x=(i*97+t*0.02)%_W;const y=(i*173+t*0.01)%_H;
+        const a=Math.max(0,.15-Math.abs(Math.sin(t*.005+i))*.1);
+        fillCircle(x,y,1,`rgba(180,180,200,${a})`);}
+      // The Last Star
+      const cx=_W/2,cy=_H/2;
+      const bright=.7+.3*Math.sin(t*.03);
+      for(let ray=0;ray<8;ray++){const a=ray/8*6.2832+t*.003;
+        line(cx,cy,cx+Math.cos(a)*(40+Math.sin(t*.04+ray)*8),cy+Math.sin(a)*(40+Math.sin(t*.04+ray)*8),
+          `rgba(${r},${g},${b},${.2*bright})`,2);}
+      fillCircle(cx,cy,14,`rgba(${r},${g},${b},${bright})`);
+      fillCircle(cx,cy,8,`rgba(255,255,200,.95)`);
+      if(Math.random()<.1){const a=Math.random()*6.2832;
+        addParticle(cx+Math.cos(a)*14,cy+Math.sin(a)*14*.5,Math.cos(a)*1,Math.sin(a)*.5,1,2+Math.random()*3,50+Math.random()*20);}
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.02;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},100%,80%,${plife[i]})`);}}}),
+    nullHymn:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      // Sound waves dissolving into void
+      for(let harmonic=1;harmonic<=5;harmonic++){_ctx.beginPath();
+        for(let x=0;x<=_W;x+=3){const amp=25/harmonic*(1-x/_W*.5);
+          const y=_H/2+Math.sin(x/_W*6.2832*harmonic+t*.02)*amp;
+          x===0?_ctx.moveTo(x,y):_ctx.lineTo(x,y);}
+        _ctx.strokeStyle=`rgba(${r},${g},${b},${.35/harmonic})`;_ctx.lineWidth=2.5/harmonic;_ctx.stroke();}
+      // Notes vanishing into right side
+      if(Math.random()<.15)addParticle(_W*.1,_H/2+(Math.random()-.5)*_H*.4,1+Math.random()*1.5,(Math.random()-.5)*.5,1,4+Math.random()*5,Math.random()*360);
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];psz[i]*=.985;plife[i]-=.008;
+        if(plife[i]<=0||psz[i]<.5||px[i]>_W){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},80%,60%,${plife[i]*.7})`);}}}),
+    prismaticHeart:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // Heart with rainbow pulse
+      const beat=Math.abs(Math.sin(t*.05));
+      const scale=1+beat*.2;
+      _ctx.save();_ctx.translate(cx,cy);_ctx.scale(scale,scale);
+      _ctx.beginPath();
+      _ctx.moveTo(0,8);_ctx.bezierCurveTo(20,-8,30,5,0,28);_ctx.bezierCurveTo(-30,5,-20,-8,0,8);
+      const grad=_ctx.createLinearGradient(-30,-10,30,30);
+      for(let i=0;i<=6;i++){grad.addColorStop(i/6,`hsl(${(i*60+t)%360},90%,65%)`);}
+      _ctx.fillStyle=grad;_ctx.fill();
+      _ctx.strokeStyle='rgba(255,255,255,.6)';_ctx.lineWidth=1;_ctx.stroke();
+      _ctx.restore();
+      if(beat>.85&&Math.random()<.4){const a=Math.random()*6.2832;
+        addParticle(cx,cy+10,Math.cos(a)*(2+Math.random()*3),Math.sin(a)*(2+Math.random()*3)*.5,1,2+Math.random()*4,Math.random()*360);}
+      for(let i=pcount-1;i>=0;i--){px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.02;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},100%,75%,${plife[i]})`);}}}),
+    eclipseSovereign:({r,g,b})=>({frame(t){_ctx.clearRect(0,0,_W,_H);
+      const cx=_W/2,cy=_H/2;
+      // Corona rays
+      for(let i=0;i<24;i++){const a=i/24*6.2832+t*.003;
+        const len=30+Math.sin(t*.04+i*.5)*15;
+        line(cx+Math.cos(a)*22,cy+Math.sin(a)*11,cx+Math.cos(a)*(22+len),cy+Math.sin(a)*(22+len)*.5,
+          `rgba(${r},${g},${b},${.2+Math.sin(t*.05+i)*.05})`,1.5);}
+      // Two-tone disk
+      fillCircle(cx,cy,20,`rgba(0,0,0,.95)`);
+      _ctx.save();_ctx.translate(cx,cy);
+      _ctx.beginPath();_ctx.arc(0,0,20,-Math.PI/2,Math.PI/2);
+      _ctx.fillStyle=`rgba(255,240,180,.5)`;_ctx.fill();_ctx.restore();
+      strokeCircle(cx,cy,20,`rgba(${r},${g},${b},.7)`,2);
+      strokeCircle(cx,cy,24,`rgba(${r},${g},${b},.3)`,1);
+      // Sparks
+      if(Math.random()<.18){const a=Math.random()*6.2832;
+        addParticle(cx+Math.cos(a)*22,cy+Math.sin(a)*11,Math.cos(a)*(1+Math.random()*2),Math.sin(a)*(1+Math.random()*2)*.5,1,2+Math.random()*4,30+Math.random()*30);}
+      for(let i=pcount-1;i>=0;i--){pvx[i]*=.98;pvy[i]*=.98;px[i]+=pvx[i];py[i]+=pvy[i];plife[i]-=.018;
+        if(plife[i]<=0){removeParticle(i);continue;}
+        fillCircle(px[i],py[i],psz[i]*plife[i],`hsla(${phue[i]},90%,75%,${plife[i]})`);}}})
+  });
+
+  // Update coin values for rarity tiers if missing (already exists, but ensures Mythic/Divine etc covered)
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   2) CRAFTING SYSTEM (Sols-RNG style)
+   ═══════════════════════════════════════════════════════════════ */
+(function(){
+
+  // Recipe format:
+  //   inputs:  [{name, count}]  -- consumed from collection
+  //   coins:   number           -- optional coin cost
+  //   output:  aura name
+  const RECIPES = [
+    {
+      output: 'Moonpetal',
+      coins: 0,
+      inputs: [
+        {name:'Leaf',  count:5},
+        {name:'Frost', count:5},
+        {name:'Aurora',count:1},
+      ]
+    },
+    {
+      output: 'Stormcaller',
+      coins: 0,
+      inputs: [
+        {name:'Thunderclap',count:5},
+        {name:'Lightning',  count:3},
+        {name:'Hurricane',  count:1},
+      ]
+    },
+    {
+      output: 'Sunforged',
+      coins: 500,
+      inputs: [
+        {name:'Inferno',   count:3},
+        {name:'Lava Flow', count:3},
+        {name:'Solar Flare',count:1},
+      ]
+    },
+    {
+      output: 'Frostbloom',
+      coins: 500,
+      inputs: [
+        {name:'Blizzard', count:3},
+        {name:'Crystal Rain',count:3},
+        {name:'Frost',    count:10},
+      ]
+    },
+    {
+      output: 'Hollow Crown',
+      coins: 2500,
+      inputs: [
+        {name:'Forgotten God', count:2},
+        {name:'Shadow',         count:5},
+        {name:'Soul Shard',     count:3},
+      ]
+    },
+    {
+      output: 'Voidsong',
+      coins: 2500,
+      inputs: [
+        {name:'Requiem',       count:1},
+        {name:'Void Mist',     count:5},
+        {name:'Ancient Void',  count:1},
+      ]
+    },
+    {
+      output: 'Astral Loom',
+      coins: 10000,
+      inputs: [
+        {name:'Nebula', count:2},
+        {name:'Dark Galaxy',count:2},
+        {name:'Time Fragment',count:5},
+      ]
+    },
+    {
+      output: 'Lifebinder',
+      coins: 10000,
+      inputs: [
+        {name:'Ancient Grove', count:3},
+        {name:'Eternal Flame', count:1},
+        {name:'Phoenix',       count:2},
+      ]
+    },
+    {
+      output: 'Cosmic Bloom',
+      coins: 50000,
+      inputs: [
+        {name:'Universe',     count:1},
+        {name:'Multiverse',   count:1},
+        {name:'Nebula',       count:3},
+      ]
+    },
+    {
+      output: 'Heavens Gate',
+      coins: 250000,
+      inputs: [
+        {name:'Divine Light', count:1},
+        {name:'Elysium',      count:1},
+        {name:'Godhood',      count:1},
+      ]
+    },
+    // ── CRAFTED-ONLY auras (cannot be rolled) ──
+    {
+      output: 'Prismatic Heart',
+      coins: 100000,
+      inputs: [
+        {name:'Prism',     count:3},
+        {name:'Amethyst',  count:3},
+        {name:'Aurora',    count:3},
+        {name:'Crystal Rain',count:3},
+      ]
+    },
+    {
+      output: 'Eclipse Sovereign',
+      coins: 500000,
+      inputs: [
+        {name:'Eclipse',      count:3},
+        {name:'Pure Light',   count:1},
+        {name:'Pure Darkness',count:1},
+        {name:'Black Hole',   count:1},
+        {name:'Solar Flare',  count:1},
+      ]
+    },
+  ];
+
+  // Expose for admin/debug
+  window.RECIPES = RECIPES;
+
+  // Add the Craft button to the history header
+  function injectCraftButton(){
+    const hdr = document.querySelector('.history-header');
+    if(!hdr || hdr.querySelector('.craft-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'craft-btn';
+    btn.textContent = '⚗️ Craft';
+    btn.onclick = openCraft;
+    hdr.appendChild(btn);
+  }
+
+  let _craftOverlay = null;
+
+  window.openCraft = function(){
+    if(_craftOverlay) return;
+    _craftOverlay = document.createElement('div');
+    _craftOverlay.className = 'craft-overlay';
+    _craftOverlay.innerHTML = `
+      <div class="craft-inner">
+        <div class="craft-topbar">
+          <div>
+            <div class="craft-title">⚗️ Crafting</div>
+            <div class="craft-stats">Sacrifice auras from your collection to forge new ones</div>
+          </div>
+          <button class="craft-close" onclick="closeCraft()">✕ Close</button>
+        </div>
+        <div id="craftContent"></div>
+      </div>`;
+    document.body.appendChild(_craftOverlay);
+    renderCraft();
+  };
+
+  window.closeCraft = function(){
+    if(_craftOverlay){ _craftOverlay.remove(); _craftOverlay = null; }
+  };
+
+  window.renderCraft = function(){
+    const content = document.getElementById('craftContent');
+    if(!content) return;
+    content.innerHTML = '';
+    const coll = st.collection || {};
+
+    RECIPES.forEach(recipe => {
+      const outItem = ITEMS.find(i => i.name === recipe.output);
+      if(!outItem) return;
+      const alreadyOwned = (coll[recipe.output] || 0) > 0;
+
+      // Check ingredient availability
+      const ingrStatus = recipe.inputs.map(inp => ({
+        name: inp.name,
+        need: inp.count,
+        have: coll[inp.name] || 0,
+        item: ITEMS.find(i => i.name === inp.name)
+      }));
+      const hasAllIngredients = ingrStatus.every(s => s.have >= s.need);
+      const hasCoins = st.coins >= (recipe.coins || 0);
+      const canCraft = hasAllIngredients && hasCoins;
+
+      const card = document.createElement('div');
+      card.className = 'recipe-card';
+      card.style.borderColor = outItem.color + '33';
+
+      const ingrHTML = ingrStatus.map(s => {
+        const c = s.item ? s.item.color : '#9ca3af';
+        const enough = s.have >= s.need;
+        return `<div class="ingr-chip" style="--ic:${c}99">
+          <span>${s.item?s.item.emoji:'❓'} ${s.name}</span>
+          <span class="${enough?'got':'need'}">${s.have}/${s.need}</span>
+        </div>`;
+      }).join('');
+
+      const coinHTML = recipe.coins > 0
+        ? `<div class="ingr-chip" style="--ic:${hasCoins?'#fbbf2499':'#ef444499'}">
+            <span>💰 Coins</span>
+            <span class="${hasCoins?'got':'need'}">${st.coins.toLocaleString()}/${recipe.coins.toLocaleString()}</span>
+          </div>`
+        : '';
+
+      const btnLabel = alreadyOwned
+        ? '✓ Already Crafted (Craft Again)'
+        : canCraft
+          ? '⚗️ Craft'
+          : !hasAllIngredients ? '🔒 Missing Ingredients'
+          : '💰 Not Enough Coins';
+
+      card.innerHTML = `
+        <div class="recipe-head">
+          <div class="recipe-name" style="color:${outItem.color}">
+            <span>${outItem.emoji}</span><span>${outItem.name}</span>
+          </div>
+          <div class="recipe-rarity" style="color:${outItem.color}">${outItem.rarity}</div>
+        </div>
+        <div class="recipe-desc">${outItem.desc}</div>
+        <div class="recipe-ingredients">${ingrHTML}${coinHTML}</div>
+        <button class="craft-do-btn" ${canCraft?'':'disabled'}>${btnLabel}</button>
+      `;
+
+      const btn = card.querySelector('.craft-do-btn');
+      if(canCraft){
+        btn.onclick = () => doCraft(recipe);
+      }
+
+      content.appendChild(card);
+    });
+  };
+
+  function doCraft(recipe){
+    const coll = st.collection || {};
+    // Re-verify
+    for(const inp of recipe.inputs){
+      if((coll[inp.name]||0) < inp.count) return;
+    }
+    if(st.coins < (recipe.coins||0)) return;
+
+    // Consume
+    for(const inp of recipe.inputs){
+      coll[inp.name] -= inp.count;
+      if(coll[inp.name] <= 0) delete coll[inp.name];
+    }
+    if(recipe.coins) st.coins -= recipe.coins;
+
+    // Award output
+    const outItem = ITEMS.find(i => i.name === recipe.output);
+    if(outItem){
+      coll[outItem.name] = (coll[outItem.name]||0) + 1;
+      // Set as last result & show on card
+      st.lastResult = outItem;
+      setCard(outItem, false);
+      // Also push into history
+      addHistory(outItem);
+      showToast('⚗️ Crafted: ' + outItem.name + '!');
+    }
+
+    st.collection = coll;
+    saveGame();
+    updateUI();
+    renderCraft();
+    if(typeof renderCollection === 'function' && document.getElementById('collContent')) renderCollection();
+  }
+
+  // Wait for DOM
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', injectCraftButton);
+  } else {
+    injectCraftButton();
+  }
+  // Also re-inject after a tick in case collection script runs late
+  setTimeout(injectCraftButton, 200);
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   3) REWORKED AUTO-ROLL with configurable stop conditions
+   ═══════════════════════════════════════════════════════════════ */
+(function(){
+  // Auto-roll settings persisted alongside save
+  st.autoCfg = st.autoCfg || {
+    stopRarities: ['Mythic','Divine','Cosmic','Celestial','Transcendent','Primordial','Abyssal','Eternal','Omega','Secret','Ultra Secret','Null','Impossible'],
+    maxRolls: 0,         // 0 = unlimited
+    stopAtCoins: 0,      // 0 = disabled
+    rollsSinceAuto: 0    // counter
+  };
+
+  // Restore from localStorage
+  try {
+    const saved = JSON.parse(localStorage.getItem('auraRNG_v1') || '{}');
+    if(saved.autoCfg){
+      st.autoCfg = Object.assign(st.autoCfg, saved.autoCfg);
+      st.autoCfg.rollsSinceAuto = 0; // reset session counter
+    }
+  } catch(e){}
+
+  // Patch saveGame to persist autoCfg
+  const _origSave = window.saveGame;
+  window.saveGame = function(){
+    _origSave();
+    // Append autoCfg to saved blob
+    try {
+      const raw = JSON.parse(localStorage.getItem('auraRNG_v1') || '{}');
+      raw.autoCfg = {
+        stopRarities: st.autoCfg.stopRarities,
+        maxRolls: st.autoCfg.maxRolls,
+        stopAtCoins: st.autoCfg.stopAtCoins
+      };
+      localStorage.setItem('auraRNG_v1', JSON.stringify(raw));
+    } catch(e){}
+  };
+
+  // Override the hardcoded behavior at end of startRoll().
+  // Approach: monkey-patch startRoll so we re-implement the auto-continuation,
+  // but intercept by hooking a wrapper around the existing flow via addHistory().
+  // Simpler: override startRoll entirely with a fixed copy. Since startRoll is
+  // declared with `function`, it's hoisted as a global — we replace it.
+  //
+  // To avoid duplicating its long body, we instead intercept the moment a roll
+  // completes. The original calls `startRoll` recursively via setTimeout for autoRolling.
+  // We override that recursion by patching `startRoll`'s callback path via a flag.
+  //
+  // Easiest reliable approach: replace startRoll entirely with a version that
+  // mirrors the original but uses the new stop logic. We'll re-implement using
+  // the same building blocks (weightedRandom, setCard, etc.) already global.
+
+  // Re-implement startRoll with new auto-stop logic
+  window.startRoll = function(){
+    if(st.rolling) return;
+    st.rolling = true;
+    document.getElementById('rollBtn').disabled = true;
+    const result = weightedRandom();
+    const dur = SPEED_DUR[st.speedLevel];
+    const sched = [];
+    for(let i=0;i<18;i++) sched.push(55);
+    const raw=[70,88,110,140,178,225,285,360,455,575,730,930];
+    const rawSum = raw.reduce((a,b)=>a+b,0) + 18*55;
+    const sc = Math.max(.3, dur/rawSum);
+    raw.forEach(d => sched.push(Math.round(d*sc)));
+
+    const $rollCard = document.getElementById('rollCard');
+    const $idle = document.getElementById('idleView');
+    const $result = document.getElementById('resultView');
+    $rollCard.classList.add('cycling');
+    $idle.style.display='none';
+    $result.style.display='flex';
+
+    let idx=0, lastTime=performance.now();
+    function tick(now){
+      if(idx >= sched.length){
+        $rollCard.classList.remove('cycling');
+        setCard(result, false);
+        $rollCard.classList.remove('revealed-anim');
+        void $rollCard.offsetWidth;
+        $rollCard.classList.add('revealed-anim');
+        spawnParticles(result);
+        const earned = COIN_VAL[result.rarity];
+        st.coins += earned;
+        showToast('+'+earned.toLocaleString()+' 💰');
+        if(st.luckLeft > 0){ st.luckLeft--; if(st.luckLeft <= 0){ st.luck=1; st.luckLeft=0; } }
+        st.rolls++;
+        st.lastResult = result;
+        addHistory(result);
+        updateUI();
+        saveGame();
+        st.rolling = false;
+        document.getElementById('rollBtn').disabled = false;
+
+        // ── NEW AUTO-ROLL LOGIC ──
+        if(st.autoRolling){
+          st.autoCfg.rollsSinceAuto = (st.autoCfg.rollsSinceAuto || 0) + 1;
+          const cfg = st.autoCfg;
+          let stop = false;
+          let stopReason = '';
+
+          if(cfg.stopRarities && cfg.stopRarities.includes(result.rarity)){
+            stop = true;
+            stopReason = '✋ Stop on '+result.rarity+': '+result.name;
+          }
+          if(!stop && cfg.maxRolls > 0 && cfg.rollsSinceAuto >= cfg.maxRolls){
+            stop = true;
+            stopReason = '✋ Reached '+cfg.maxRolls+' auto-rolls';
+          }
+          if(!stop && cfg.stopAtCoins > 0 && st.coins >= cfg.stopAtCoins){
+            stop = true;
+            stopReason = '✋ Reached '+cfg.stopAtCoins.toLocaleString()+' 💰';
+          }
+
+          if(stop){
+            st.autoRolling = false;
+            st.autoCfg.rollsSinceAuto = 0;
+            updateAutoRollerUI();
+            showToast(stopReason);
+          } else {
+            setTimeout(startRoll, 80);
+          }
+        }
+        return;
+      }
+      if(now - lastTime >= sched[idx]){
+        setCycleFrame(ITEMS[Math.floor(Math.random()*ITEMS.length)]);
+        lastTime = now;
+        idx++;
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  };
+
+  // Reset rollsSinceAuto when toggling auto on
+  const _origToggle = window.toggleAutoRoll;
+  window.toggleAutoRoll = function(){
+    if(!st.autoRollerOwned) return;
+    if(!st.autoRolling){
+      st.autoCfg.rollsSinceAuto = 0;
+    }
+    _origToggle();
+  };
+
+  // ── Config UI ──
+  let _cfgOverlay = null;
+
+  window.openAutoCfg = function(){
+    if(_cfgOverlay) return;
+    _cfgOverlay = document.createElement('div');
+    _cfgOverlay.className = 'autocfg-overlay';
+    _cfgOverlay.innerHTML = `
+      <div class="autocfg-inner">
+        <div class="autocfg-topbar">
+          <div>
+            <div class="autocfg-title">🤖 Auto-Roll Settings</div>
+            <div class="autocfg-sub">Configure when the auto-roller should stop</div>
+          </div>
+          <button class="autocfg-close" onclick="closeAutoCfg()">✕ Close</button>
+        </div>
+        <div class="autocfg-section">
+          <h3>Stop on these rarities</h3>
+          <div class="rarity-toggle-grid" id="rarityToggles"></div>
+          <div class="autocfg-hint">Click rarities to toggle. Auto-roll will stop the moment you roll any of these.</div>
+        </div>
+        <div class="autocfg-section">
+          <h3>Stop after N rolls</h3>
+          <div class="autocfg-row">
+            <label>Max rolls (0 = unlimited):</label>
+            <input type="number" id="cfgMaxRolls" min="0" value="${st.autoCfg.maxRolls}">
+          </div>
+        </div>
+        <div class="autocfg-section">
+          <h3>Stop at coin total</h3>
+          <div class="autocfg-row">
+            <label>Stop at coins (0 = disabled):</label>
+            <input type="number" id="cfgStopCoins" min="0" value="${st.autoCfg.stopAtCoins}">
+          </div>
+          <div class="autocfg-hint">Useful for grinding to a specific shop purchase, then stopping automatically.</div>
+        </div>
+        <button class="craft-do-btn" style="margin-top:8px" onclick="saveAutoCfg()">💾 Save Settings</button>
+      </div>`;
+    document.body.appendChild(_cfgOverlay);
+    renderRarityToggles();
+
+    // Wire up number inputs to update on change
+    document.getElementById('cfgMaxRolls').onchange = (e) => {
+      st.autoCfg.maxRolls = Math.max(0, parseInt(e.target.value) || 0);
+    };
+    document.getElementById('cfgStopCoins').onchange = (e) => {
+      st.autoCfg.stopAtCoins = Math.max(0, parseInt(e.target.value) || 0);
+    };
+  };
+
+  window.closeAutoCfg = function(){
+    if(_cfgOverlay){ _cfgOverlay.remove(); _cfgOverlay = null; }
+  };
+
+  window.saveAutoCfg = function(){
+    // Pull latest numeric values
+    const m = document.getElementById('cfgMaxRolls');
+    const c = document.getElementById('cfgStopCoins');
+    if(m) st.autoCfg.maxRolls = Math.max(0, parseInt(m.value) || 0);
+    if(c) st.autoCfg.stopAtCoins = Math.max(0, parseInt(c.value) || 0);
+    saveGame();
+    showToast('💾 Auto-roll settings saved');
+    closeAutoCfg();
+  };
+
+  function renderRarityToggles(){
+    const grid = document.getElementById('rarityToggles');
+    if(!grid) return;
+    grid.innerHTML = '';
+    RARITY_RANK.forEach(rarity => {
+      const r = RARITIES[rarity];
+      const active = st.autoCfg.stopRarities.includes(rarity);
+      const el = document.createElement('div');
+      el.className = 'rarity-toggle' + (active ? ' active' : '');
+      el.style.setProperty('--rc', r.color);
+      el.style.setProperty('--rg', r.glow);
+      el.innerHTML = `<span class="check">✓</span><span>${rarity}</span>`;
+      el.onclick = () => {
+        const idx = st.autoCfg.stopRarities.indexOf(rarity);
+        if(idx >= 0) st.autoCfg.stopRarities.splice(idx, 1);
+        else st.autoCfg.stopRarities.push(rarity);
+        el.classList.toggle('active');
+      };
+      grid.appendChild(el);
+    });
+  }
+
+  // Inject ⚙ config button next to the auto-roll button
+  function injectAutoCfgButton(){
+    const autoBtn = document.getElementById('autoBtn');
+    if(!autoBtn) return;
+    if(document.getElementById('autoCfgBtn')) return;
+    const cfgBtn = document.createElement('button');
+    cfgBtn.id = 'autoCfgBtn';
+    cfgBtn.className = 'auto-cfg-btn';
+    cfgBtn.textContent = '⚙ Auto Settings';
+    cfgBtn.style.display = st.autoRollerOwned ? '' : 'none';
+    cfgBtn.onclick = openAutoCfg;
+    autoBtn.parentNode.insertBefore(cfgBtn, autoBtn.nextSibling);
+  }
+
+  // Make config button visibility follow auto-roller ownership
+  const _origUpdateAuto = window.updateAutoRollerUI;
+  window.updateAutoRollerUI = function(){
+    _origUpdateAuto();
+    const cfgBtn = document.getElementById('autoCfgBtn');
+    if(cfgBtn) cfgBtn.style.display = st.autoRollerOwned ? '' : 'none';
+  };
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', injectAutoCfgButton);
+  } else {
+    injectAutoCfgButton();
+  }
+  setTimeout(injectAutoCfgButton, 200);
+  // Re-run UI updates so config button visibility is correct after load
+  setTimeout(()=>{ if(typeof updateAutoRollerUI==='function') updateAutoRollerUI(); }, 250);
+
+})();
+</script>
+  
 </body>
 </html>
